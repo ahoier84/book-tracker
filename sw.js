@@ -1,4 +1,4 @@
-const CACHE = 'book-tracker-v2';
+const CACHE = 'book-tracker-v3';
 const STATIC = [
   '/book-tracker/',
   '/book-tracker/index.html',
