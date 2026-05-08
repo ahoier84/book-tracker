@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#3B82F6">
+  <title>Book Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Header -->
+    <header id="app-header">
+      <div id="header-row">
+        <h1 id="header-title">My Library</h1>
+        <span id="book-count"></span>
+      </div>
+      <div id="search-container">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="search" id="search-input" placeholder="Search by title or author…" autocomplete="off" autocorrect="off">
+        <button id="search-clear" class="hidden" aria-label="Clear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Views -->
+    <main id="main-content">
+
+      <!-- ── Library ── -->
+      <div id="view-library" class="view active">
+        <div id="book-list-container">
+          <div id="book-list"></div>
+          <div id="empty-state">
+            <div class="empty-icon">📚</div>
+            <h2>Your library is empty</h2>
+            <p>Tap <strong>Scan</strong> to add a book by barcode<br>or <strong>Add</strong> to enter one manually.</p>
+          </div>
+        </div>
+        <nav id="alpha-nav" aria-label="Jump to letter"></nav>
+      </div>
+
+      <!-- ── Scanner ── -->
+      <div id="view-scanner" class="view">
+        <div id="scanner-wrapper">
+          <div id="qr-reader"></div>
+          <div id="scan-frame">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+          </div>
+        </div>
+        <p id="scanner-message">Point camera at the barcode on the back of a book</p>
+        <div id="manual-isbn-row">
+          <input type="number" id="isbn-manual" placeholder="Or enter ISBN…" inputmode="numeric">
+          <button id="isbn-lookup-btn">Look Up</button>
+        </div>
+      </div>
+
+      <!-- ── Add Manual ── -->
+      <div id="view-add" class="view">
+        <form id="manual-add-form" novalidate>
+          <div class="form-group">
+            <label for="input-title">Title <span class="required">*</span></label>
+            <input type="text" id="input-title" placeholder="Book title" autocorrect="on" required>
+          </div>
+          <div class="form-group">
+            <label for="input-author">Author <span class="required">*</span></label>
+            <input type="text" id="input-author" placeholder="Author name" autocorrect="on" required>
+          </div>
+          <div class="form-group">
+            <label for="input-year">Year</label>
+            <input type="number" id="input-year" placeholder="e.g. 1984" inputmode="numeric" min="1000" max="2099">
+          </div>
+          <div class="form-group">
+            <label for="input-isbn">ISBN</label>
+            <input type="text" id="input-isbn" placeholder="ISBN-13 or ISBN-10" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label for="input-publisher">Publisher</label>
+            <input type="text" id="input-publisher" placeholder="Publisher (optional)">
+          </div>
+          <button type="submit" id="add-book-btn">Add to Library</button>
+        </form>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav">
+      <button class="nav-btn active" data-view="library" aria-label="Library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Library</span>
+      </button>
+      <button class="nav-btn" data-view="scanner" aria-label="Scan ISBN">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M2 9V5a2 2 0 0 1 2-2h4M2 15v4a2 2 0 0 0 2 2h4M22 9V5a2 2 0 0 0-2-2h-4M22 15v4a2 2 0 0 1-2 2h-4"/>
+          <line x1="7" y1="12" x2="7" y2="12.01"/><line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="17" y1="12" x2="17" y2="12.01"/>
+        </svg>
+        <span>Scan</span>
+      </button>
+      <button class="nav-btn" data-view="add" aria-label="Add book manually">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        <span>Add</span>
+      </button>
+    </nav>
+
+  </div><!-- #app -->
+
+  <!-- Book Preview Modal (after scan) -->
+  <div id="book-preview-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Book found">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div id="preview-loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Looking up book…</p>
+      </div>
+      <div id="preview-content" class="hidden">
+        <h2 class="modal-heading">Book Found</h2>
+        <div id="preview-book-row">
+          <div id="preview-cover-wrap">
+            <img id="preview-cover" src="" alt="Cover" onerror="this.style.display='none'">
+            <div id="preview-cover-fallback" class="cover-fallback"></div>
+          </div>
+          <div id="preview-details">
+            <p id="preview-title" class="preview-title"></p>
+            <p id="preview-author" class="preview-author"></p>
+            <p id="preview-year" class="preview-meta"></p>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="preview-add-btn" class="btn-primary">Add to Library</button>
+          <button id="preview-cancel-btn" class="btn-ghost">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Book Detail Modal -->
+  <div id="book-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Book details">
+    <div class="modal-sheet detail-sheet">
+      <div class="sheet-handle"></div>
+      <button id="detail-close-btn" class="icon-btn close-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+      <div id="detail-cover-wrap">
+        <img id="detail-cover" src="" alt="Cover" onerror="this.style.display='none'">
+        <div id="detail-cover-fallback" class="cover-fallback large"></div>
+      </div>
+      <h2 id="detail-title"></h2>
+      <p id="detail-author" class="detail-author"></p>
+      <div id="detail-meta" class="detail-meta-row"></div>
+      <p id="detail-description" class="detail-description"></p>
+      <button id="detail-delete-btn" class="btn-danger">Remove from Library</button>
+    </div>
+  </div>
+
+  <!-- Letter indicator overlay -->
+  <div id="letter-indicator" class="letter-indicator hidden"></div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
