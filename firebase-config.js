@@ -34,10 +34,11 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID",
+  apiKey:            "AIzaSyDKk8H0AaVOBqXJPa78hQLBknlFwToim2I",
+  authDomain:        "book-tracker-9a8cf.firebaseapp.com",
+  projectId:         "book-tracker-9a8cf",
+  storageBucket:     "book-tracker-9a8cf.firebasestorage.app",
+  messagingSenderId: "844507556614",
+  appId:             "1:844507556614:web:461033da946caa19544c87",
+  measurementId:     "G-XNHJXD9G35",
 };
