@@ -1,5 +1,5 @@
 const CACHE = 'book-tracker-v1';
-const STATIC = ['/', '/index.html', '/style.css', '/app.js'];
+const STATIC = ['/book-tracker/', '/book-tracker/index.html', '/book-tracker/style.css', '/book-tracker/app.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
