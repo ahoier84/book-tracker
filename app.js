@@ -241,15 +241,84 @@ function setupSearch() {
 
 /* ════════════════════════════
    Scanner
+   Tries native BarcodeDetector first (iOS 17+, hardware-accelerated),
+   falls back to html5-qrcode for older devices.
 ════════════════════════════ */
+let nativeStream    = null;
+let nativeScanLoop  = false;
+
 async function startScanner() {
-  if (html5QrCode?.isScanning) return;
+  if (nativeStream || html5QrCode?.isScanning) return;
+  if (await startNativeScanner()) return;
+  await startFallbackScanner();
+}
 
+/* ── Native BarcodeDetector (fast path) ── */
+async function startNativeScanner() {
+  if (!('BarcodeDetector' in window)) return false;
+
+  try {
+    const supported = await BarcodeDetector.getSupportedFormats();
+    const wanted    = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+    const formats   = wanted.filter(f => supported.includes(f));
+    if (!formats.includes('ean_13')) return false;
+
+    nativeStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+      }
+    });
+
+    const readerDiv = document.getElementById('qr-reader');
+    readerDiv.innerHTML = '';
+    const video = Object.assign(document.createElement('video'), {
+      playsInline: true, muted: true, autoplay: true,
+    });
+    video.style.cssText = 'width:100%;height:auto;display:block;';
+    video.srcObject = nativeStream;
+    readerDiv.appendChild(video);
+    await video.play();
+
+    const detector = new BarcodeDetector({ formats });
+    nativeScanLoop  = true;
+
+    const tick = async () => {
+      if (!nativeScanLoop) return;
+      try {
+        if (video.readyState >= 2) {
+          const hits = await detector.detect(video);
+          if (hits.length) { await onScanSuccess(hits[0].rawValue); return; }
+        }
+      } catch (_) {}
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return true;
+
+  } catch (err) {
+    console.warn('Native BarcodeDetector failed:', err);
+    stopNativeStream();
+    return false;
+  }
+}
+
+function stopNativeStream() {
+  nativeScanLoop = false;
+  if (nativeStream) {
+    nativeStream.getTracks().forEach(t => t.stop());
+    nativeStream = null;
+    document.getElementById('qr-reader').innerHTML = '';
+  }
+}
+
+/* ── html5-qrcode fallback ── */
+async function startFallbackScanner() {
   html5QrCode = new Html5Qrcode('qr-reader', { verbose: false });
-
   const config = {
-    fps: 12,
-    qrbox: (w, h) => ({ width: Math.min(280, Math.floor(w * 0.78)), height: 90 }),
+    fps: 15,
+    qrbox: (w) => ({ width: Math.min(280, Math.floor(w * 0.78)), height: 90 }),
     formatsToSupport: [
       Html5QrcodeSupportedFormats.EAN_13,
       Html5QrcodeSupportedFormats.EAN_8,
@@ -257,19 +326,18 @@ async function startScanner() {
       Html5QrcodeSupportedFormats.UPC_E,
       Html5QrcodeSupportedFormats.CODE_128,
     ],
-    rememberLastUsedCamera: true,
   };
-
   try {
     await html5QrCode.start({ facingMode: 'environment' }, config, onScanSuccess, () => {});
   } catch (err) {
-    console.warn('Camera start failed:', err);
+    console.warn('Fallback scanner failed:', err);
     document.getElementById('scanner-message').textContent =
       'Camera unavailable — enter the ISBN below instead.';
   }
 }
 
 async function stopScanner() {
+  stopNativeStream();
   if (html5QrCode?.isScanning) {
     try { await html5QrCode.stop(); } catch (_) {}
   }
