@@ -1,5 +1,11 @@
-const CACHE = 'book-tracker-v1';
-const STATIC = ['/book-tracker/', '/book-tracker/index.html', '/book-tracker/style.css', '/book-tracker/app.js'];
+const CACHE = 'book-tracker-v2';
+const STATIC = [
+  '/book-tracker/',
+  '/book-tracker/index.html',
+  '/book-tracker/style.css',
+  '/book-tracker/app.js',
+  '/book-tracker/firebase-config.js',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(

@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupDetailModal();
   buildAlphaNav();
   renderLibrary();
+  initSync();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
@@ -658,12 +659,14 @@ function highlight(id) {
 function addBook(book) {
   books.push(book);
   persist();
+  syncAdd(book);
   renderLibrary();
 }
 
 function removeBook(id) {
   books = books.filter(b => b.id !== id);
   persist();
+  syncRemove(id);
   renderLibrary();
   showToast('Removed from library.');
 }
@@ -684,6 +687,158 @@ function showToast(msg) {
     el.classList.add('fade');
     setTimeout(() => el.classList.add('hidden'), 320);
   }, 2600);
+}
+
+/* ════════════════════════════
+   Cloud Sync  (Firebase Firestore + Google Sign-In)
+   Safe no-op when firebase-config.js has placeholder values or
+   the Firebase SDKs fail to load.
+════════════════════════════ */
+let _db        = null;
+let _auth      = null;
+let _syncUid   = null;
+let _syncUnsub = null;
+
+function isSyncConfigured() {
+  return typeof firebase !== 'undefined' &&
+         typeof FIREBASE_CONFIG !== 'undefined' &&
+         FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+}
+
+function initSync() {
+  if (!isSyncConfigured()) return;
+
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _auth = firebase.auth();
+    _db   = firebase.firestore();
+
+    // Wire up the sync button
+    const btn = document.getElementById('sync-btn');
+    if (btn) btn.addEventListener('click', handleSyncBtn);
+
+    // React to sign-in / sign-out
+    _auth.onAuthStateChanged(user => {
+      if (user) {
+        _syncUid = user.uid;
+        renderSyncBtn(user);
+        mergeAndSubscribe();
+      } else {
+        _syncUid = null;
+        renderSyncBtn(null);
+        if (_syncUnsub) { _syncUnsub(); _syncUnsub = null; }
+      }
+    });
+  } catch (e) {
+    console.warn('Firebase init failed:', e);
+  }
+}
+
+function booksRef() {
+  return _db.collection('users').doc(_syncUid).collection('books');
+}
+
+async function mergeAndSubscribe() {
+  try {
+    // 1. Pull every book stored in Firestore for this user
+    const snap   = await booksRef().get();
+    const remote = snap.docs.map(d => d.data());
+
+    // 2. Push any local-only books up to Firestore (first-device upload)
+    const remoteIds = new Set(remote.map(b => b.id));
+    const batch     = _db.batch();
+    let   pushed    = 0;
+    for (const book of books) {
+      if (!remoteIds.has(book.id)) {
+        batch.set(booksRef().doc(book.id), book);
+        pushed++;
+      }
+    }
+    if (pushed) await batch.commit();
+
+    // 3. Merge remote books into local list (add anything not already here)
+    const localIds = new Set(books.map(b => b.id));
+    for (const r of remote) {
+      if (!localIds.has(r.id)) books.push(r);
+    }
+    persist();
+    renderLibrary();
+    showToast('Library synced ☁️');
+  } catch (e) {
+    console.error('Sync merge failed:', e);
+    showToast('Sync error — check your connection.');
+  }
+
+  // 4. Subscribe for real-time changes pushed from other devices
+  _syncUnsub = booksRef().onSnapshot(snap => {
+    let changed = false;
+    snap.docChanges().forEach(ch => {
+      const data = ch.doc.data();
+      if (ch.type === 'added' || ch.type === 'modified') {
+        const idx = books.findIndex(b => b.id === data.id);
+        if (idx === -1) {
+          books.push(data);
+          changed = true;
+        } else if (JSON.stringify(books[idx]) !== JSON.stringify(data)) {
+          books[idx] = data;
+          changed = true;
+        }
+      } else if (ch.type === 'removed') {
+        const before = books.length;
+        books = books.filter(b => b.id !== data.id);
+        if (books.length !== before) changed = true;
+      }
+    });
+    if (changed) { persist(); renderLibrary(); }
+  }, e => console.error('Snapshot error:', e));
+}
+
+/* Called by addBook() / removeBook() — silent no-op when not signed in */
+async function syncAdd(book) {
+  if (!_syncUid) return;
+  try { await booksRef().doc(book.id).set(book); } catch (_) {}
+}
+
+async function syncRemove(id) {
+  if (!_syncUid) return;
+  try { await booksRef().doc(id).delete(); } catch (_) {}
+}
+
+async function handleSyncBtn() {
+  if (!isSyncConfigured()) {
+    showToast('Add your Firebase config to firebase-config.js first.');
+    return;
+  }
+  if (_syncUid) {
+    if (confirm('Sign out and stop syncing on this device?')) {
+      await _auth.signOut();
+      showToast('Signed out.');
+    }
+  } else {
+    try {
+      await _auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    } catch (e) {
+      showToast('Sign-in failed — try again.');
+    }
+  }
+}
+
+function renderSyncBtn(user) {
+  const btn = document.getElementById('sync-btn');
+  if (!btn) return;
+  if (user) {
+    const avatar = user.photoURL
+      ? `<img src="${escHtml(user.photoURL)}" class="sync-avatar" alt="">`
+      : '';
+    btn.innerHTML = `${avatar}<span>${escHtml(user.displayName?.split(' ')[0] || 'Synced')}</span>`;
+    btn.classList.add('active');
+    btn.title = `Syncing as ${user.displayName} — tap to sign out`;
+  } else {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg><span>Sync</span>`;
+    btn.classList.remove('active');
+    btn.title = 'Sign in with Google to sync across devices';
+  }
 }
 
 /* ════════════════════════════

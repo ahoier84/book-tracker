@@ -67,6 +67,36 @@ body {
   font-weight: 500;
 }
 
+/* ── Sync button ── */
+.sync-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: none;
+  border-radius: 20px;
+  padding: 5px 11px 5px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.sync-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.sync-btn.active {
+  background: #ECFDF5;
+  color: #059669;
+}
+.sync-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* ── Search bar ── */
 #search-container {
   position: relative;
